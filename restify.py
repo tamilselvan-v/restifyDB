@@ -1,11 +1,14 @@
+from logging import getLogger
+
 from sqlalchemy import MetaData
 
 from config import ConfigReader
 from connection import DBConnection
-from flask import Flask, url_for
+from flask import Flask, request
 
 from db_service import DBService
-from helpers import object_as_dict
+
+logger = getLogger(__name__)
 
 app = Flask(__name__)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
@@ -27,6 +30,7 @@ def fetch_all_tables():
     meta.reflect(bind=db_connection.engine)
     return {"tables": [table for table in meta.tables.keys()]}
 
+
 @app.route("/tables/<table_name>", methods=["GET"])
 def fetch_all_rows(table_name: str):
     meta = MetaData()
@@ -40,6 +44,22 @@ def fetch_all_rows(table_name: str):
         row_json = {field: str(getattr(row, field, "")) for field in row._fields}
         result.append(row_json)
     return {"rows": result}
+
+
+@app.route("/tables/<table_name>", methods=["POST"])
+def insert_to_table(table_name: str):
+    meta = MetaData()
+    meta.reflect(bind=db_connection.engine)
+    table = meta.tables[table_name]
+    data = request.json
+    insert = table.insert().values(**data)
+    try:
+        with db_connection.session_scope() as session:
+            session.execute(insert)
+    except Exception as e:
+        logger.exception(f"inserting the record into {table_name} failed")
+    return {"status": "success"}
+
 
 
 def has_no_empty_params(rule):
