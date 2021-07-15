@@ -42,7 +42,7 @@ def fetch_all_rows(table_name: str):
     rows_per_page = int(args.pop("maxRows", 100))
     offset = (page_no - 1) * rows_per_page
     with db_connection.session_scope() as session:
-        rows = session.query(table).filter(Filters(table, args).filter_condition).offset(offset).limit(rows_per_page).all()
+        rows = session.query(table).filter(Filters(table, args).condition).offset(offset).limit(rows_per_page).all()
 
     result = []
     for row in rows:
