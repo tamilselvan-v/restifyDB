@@ -7,6 +7,7 @@ from connection import DBConnection
 from flask import Flask, request
 
 from db_service import DBService
+from filter import Filters
 
 logger = getLogger(__name__)
 
@@ -36,11 +37,12 @@ def fetch_all_rows(table_name: str):
     meta = MetaData()
     meta.reflect(bind=db_connection.engine)
     table = meta.tables[table_name]
-    page_no = int(request.args.get("pageNo", 1))
-    rows_per_page = int(request.args.get("maxRows", 100))
+    args = dict(request.args)
+    page_no = int(args.pop("pageNo", 1))
+    rows_per_page = int(args.pop("maxRows", 100))
     offset = (page_no - 1) * rows_per_page
     with db_connection.session_scope() as session:
-        rows = session.query(table).offset(offset).limit(rows_per_page).all()
+        rows = session.query(table).filter(Filters(table, args).filter_condition).offset(offset).limit(rows_per_page).all()
 
     result = []
     for row in rows:
