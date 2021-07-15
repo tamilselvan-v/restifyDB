@@ -36,8 +36,11 @@ def fetch_all_rows(table_name: str):
     meta = MetaData()
     meta.reflect(bind=db_connection.engine)
     table = meta.tables[table_name]
+    page_no = int(request.args.get("pageNo", 1))
+    rows_per_page = int(request.args.get("maxRows", 100))
+    offset = (page_no - 1) * rows_per_page
     with db_connection.session_scope() as session:
-        rows = session.query(table).all()
+        rows = session.query(table).offset(offset).limit(rows_per_page).all()
 
     result = []
     for row in rows:
@@ -58,14 +61,8 @@ def insert_to_table(table_name: str):
             session.execute(insert)
     except Exception as e:
         logger.exception(f"inserting the record into {table_name} failed")
+        return {"error": str(e)}
     return {"status": "success"}
-
-
-
-def has_no_empty_params(rule):
-    defaults = rule.defaults if rule.defaults is not None else ()
-    arguments = rule.arguments if rule.arguments is not None else ()
-    return len(defaults) >= len(arguments)
 
 
 @app.route("/site-map")
