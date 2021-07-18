@@ -25,6 +25,7 @@ db_connection = DBConnection(**config["connection_params"])
 
 db_service = DBService(db_connection=db_connection)
 
+
 @app.route("/tables", methods=["GET"])
 def fetch_all_tables():
     meta = MetaData()
@@ -88,48 +89,36 @@ def fetch_all_rows(table_name: str):
       200:
         description: A list of rows (may be filtered by args, pageNo, maxRows)
     """
-    meta = MetaData()
-    meta.reflect(bind=db_connection.engine)
-    table = meta.tables[table_name]
     args = dict(request.args)
-    page_no = int(args.pop("pageNo", 1))
-    rows_per_page = int(args.pop("maxRows", 100))
-    offset = (page_no - 1) * rows_per_page
-    with db_connection.session_scope() as session:
-        rows = session.query(table).filter(Filters(table, args).condition).offset(offset).limit(rows_per_page).all()
-
-    result = []
-    for row in rows:
-        row_json = {field: str(getattr(row, field, "")) for field in row._fields}
-        result.append(row_json)
+    page_no = args.pop("pageNo", 1)
+    max_rows = args.pop("maxRows", 100)
+    result = db_service.get_all_rows(table_name=table_name, page_no=page_no, max_rows=max_rows, filters=args)
     return {"rows": result}
 
 
 @app.route("/tables/<table_name>", methods=["POST"])
 def insert_to_table(table_name: str):
-    meta = MetaData()
-    meta.reflect(bind=db_connection.engine)
-    table = meta.tables[table_name]
     data = request.json
-    insert = table.insert().values(**data)
     try:
-        with db_connection.session_scope() as session:
-            session.execute(insert)
+        db_service.insert_into_table(table_name=table_name, row=data)
     except Exception as e:
         logger.exception(f"inserting the record into {table_name} failed")
         return {"error": str(e)}
     return {"status": "success"}
 
+
 @app.route("/tables/<table_name>", methods=["PUT"])
 def update_row(table_name: str):
-    meta = MetaData()
-    meta.reflect(bind=db_connection.engine)
-    table = meta.tables[table_name]
     args = dict(request.args)
     body = request.json
-    with db_connection.session_scope() as session:
-        rows = session.query(table).filter(Filters(table, args).condition).update(body)
-    return {"affected rows": rows}
+    try:
+        rows_count = db_service.update_row(table_name=table_name, filters=args, values_to_be_updated=body)
+    except Exception as e:
+        logger.exception(f"updating records failed")
+        return {"error": str(e)}
+
+    return {"affected rows": rows_count}
+
 
 if __name__ == "__main__":
     app.run(port=9567)
