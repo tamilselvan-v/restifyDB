@@ -25,12 +25,6 @@ db_connection = DBConnection(**config["connection_params"])
 
 db_service = DBService(db_connection=db_connection)
 
-
-@app.route('/success/<name>')
-def success(name):
-    return 'welcome %s' % name
-
-
 @app.route("/tables", methods=["GET"])
 def fetch_all_tables():
     meta = MetaData()
@@ -126,14 +120,16 @@ def insert_to_table(table_name: str):
         return {"error": str(e)}
     return {"status": "success"}
 
-
-@app.route("/site-map")
-def site_map():
-    links = []
-    for rule in app.url_map.iter_rules():
-        links.append((str(rule), rule.endpoint, str(rule.methods)))
-    return {"routes": links}
-
+@app.route("/tables/<table_name>", methods=["PUT"])
+def update_row(table_name: str):
+    meta = MetaData()
+    meta.reflect(bind=db_connection.engine)
+    table = meta.tables[table_name]
+    args = dict(request.args)
+    body = request.json
+    with db_connection.session_scope() as session:
+        rows = session.query(table).filter(Filters(table, args).condition).update(body)
+    return {"affected rows": rows}
 
 if __name__ == "__main__":
     app.run(port=9567)
