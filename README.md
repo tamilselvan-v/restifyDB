@@ -1,4 +1,4 @@
-# restify-db
+# restifyDB
 Expose DB as REST APIs
 
 ## APIs
